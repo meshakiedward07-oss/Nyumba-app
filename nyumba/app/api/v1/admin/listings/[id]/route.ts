@@ -32,41 +32,38 @@ export async function PATCH(
     const admin = createAdminClient()
     const newStatus = action === 'approve' ? 'active' : 'rejected'
 
-    const { error: updateError } = await admin
+    const { data: updatedRows, error: updateError } = await admin
       .from('listings')
       .update({ status: newStatus })
       .eq('id', params.id)
       .eq('status', 'pending')
+      .select('dalali_id, type, district')
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
 
-    // Notify dalali via notifications table
-    const { data: listing } = await admin
-      .from('listings')
-      .select('dalali_id, type, district')
-      .eq('id', params.id)
-      .single()
-
-    if (listing) {
-      const notifTitle = action === 'approve' ? '✅ Listing Imeidhibitiwa' : '❌ Listing Ilikataliwa'
-      const notifBody  = action === 'approve'
-        ? `${listing.type} yako – ${listing.district} imeidhibitiwa na inaonekana kwa wateja.`
-        : `${listing.type} yako – ${listing.district} ilikataliwa. Angalia sababu na uirekebisha.`
-
-      await admin.from('notifications').insert({
-        user_id: listing.dalali_id,
-        title: notifTitle,
-        body: notifBody,
-        type: action === 'approve' ? 'listing_approved' : 'listing_rejected',
-        is_read: false,
-        data: { listing_id: params.id },
-      })
-
-      // Push notification
-      await sendPushToUser(listing.dalali_id, notifTitle, notifBody, '/dashboard/listings')
+    if (!updatedRows || updatedRows.length === 0) {
+      return NextResponse.json({ error: 'Listing haipatikani au si pending' }, { status: 404 })
     }
+
+    const listing = updatedRows[0]
+
+    const notifTitle = action === 'approve' ? '✅ Listing Imeidhibitiwa' : '❌ Listing Ilikataliwa'
+    const notifBody  = action === 'approve'
+      ? `${listing.type} yako – ${listing.district} imeidhibitiwa na inaonekana kwa wateja.`
+      : `${listing.type} yako – ${listing.district} ilikataliwa. Angalia sababu na uirekebisha.`
+
+    await admin.from('notifications').insert({
+      user_id: listing.dalali_id,
+      title: notifTitle,
+      body: notifBody,
+      type: action === 'approve' ? 'listing_approved' : 'listing_rejected',
+      is_read: false,
+      data: { listing_id: params.id },
+    })
+
+    await sendPushToUser(listing.dalali_id, notifTitle, notifBody, '/dashboard/listings')
 
     return NextResponse.json({ success: true, status: newStatus })
   } catch {

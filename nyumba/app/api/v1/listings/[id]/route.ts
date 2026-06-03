@@ -67,6 +67,11 @@ export async function PATCH(
     }
 
     const { type, price_monthly, bedrooms, furnished, description, region, district, amenities, images } = body
+
+    if (!type || !price_monthly || !region || !district || !furnished) {
+      return NextResponse.json({ error: 'type, price_monthly, region, district, furnished zinahitajika' }, { status: 400 })
+    }
+
     const updatePayload: Record<string, unknown> = {
       type,
       title: `${type.charAt(0).toUpperCase() + type.slice(1)} – ${district}`,

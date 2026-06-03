@@ -46,8 +46,9 @@ export default function UnlockModal({
   const [error, setError]         = useState('')
   const [secondsLeft, setSecondsLeft] = useState(TIMEOUT_SECS)
 
-  const pollRef  = useRef<ReturnType<typeof setInterval> | null>(null)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null)
+  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const mountedRef = useRef(true)
 
   // ── Stop timers ──────────────────────────────────────────
   const stopPolling = useCallback(() => {
@@ -81,6 +82,7 @@ export default function UnlockModal({
         .eq('id', id)
         .single()
 
+      if (!mountedRef.current) return
       if (data?.status === 'completed') {
         stopPolling()
         setStep('success')
@@ -93,7 +95,10 @@ export default function UnlockModal({
     }, POLL_INTERVAL_MS)
   }, [supabase, stopPolling, onUnlocked])
 
-  useEffect(() => { return () => stopPolling() }, [stopPolling])
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false; stopPolling() }
+  }, [stopPolling])
 
   // ── Initiate mobile payment ───────────────────────────────
   async function handleMobilePay(e: React.FormEvent) {

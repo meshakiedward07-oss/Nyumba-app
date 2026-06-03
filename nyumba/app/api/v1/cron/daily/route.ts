@@ -273,6 +273,13 @@ async function runDailyTasks() {
       .is('expiry_reminded_at', null)
 
     for (const listing of expiring14 || []) {
+      // Update guard FIRST — prevents duplicate reminders if notification insert fails
+      const { error: guardErr } = await admin
+        .from('listings')
+        .update({ expiry_reminded_at: nowDate.toISOString() })
+        .eq('id', listing.id)
+      if (guardErr) continue
+
       await admin.from('notifications').insert({
         user_id: listing.dalali_id,
         type: 'listing_expiring_14days',
@@ -282,10 +289,6 @@ async function runDailyTasks() {
         ref_id: listing.id,
         data: { listing_id: listing.id },
       })
-      await admin
-        .from('listings')
-        .update({ expiry_reminded_at: nowDate.toISOString() })
-        .eq('id', listing.id)
     }
     results.push(`✅ Expiry reminders 14 days: ${expiring14?.length ?? 0}`)
 
